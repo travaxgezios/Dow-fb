@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simpan Foto & Video — dari tautan Facebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0d0c;
+    --card:#171613;
+    --card-hi:#201f1b;
+    --paper:#f2ede2;
+    --red:#e3341e;
+    --muted:#948d80;
+    --line: rgba(242,237,226,0.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(227,52,30,0.10), transparent 60%),
+      var(--bg);
+    color:var(--paper);
+    font-family:'Space Grotesk',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+
+  .wrap{ max-width:480px; margin:0 auto; padding:0 20px 70px; position:relative; }
+
+  /* --- header / viewfinder --- */
+  header{ padding:40px 0 30px; }
+  .counter-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:22px;
+  }
+  .rec-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--red);
+    box-shadow:0 0 0 3px rgba(227,52,30,0.18);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;} 50%{opacity:.35;}
+  }
+  .counter{
+    font-size:12.5px; color:var(--muted); letter-spacing:.06em;
+  }
+  h1{
+    font-weight:700; font-size:clamp(30px,8.5vw,40px);
+    line-height:1.06; margin:0 0 14px; letter-spacing:-0.02em;
+  }
+  h1 span{ color:var(--red); }
+  .lede{ color:var(--muted); font-size:15px; line-height:1.6; max-width:40ch; margin:0; font-weight:400; }
+
+  /* --- form with viewfinder corner brackets --- */
+  form{ margin-top:30px; }
+  .viewfinder{
+    position:relative;
+    padding:14px;
+  }
+  .viewfinder::before,
+  .viewfinder::after,
+  .vf-tr, .vf-br{
+    content:'';
+    position:absolute;
+    width:16px; height:16px;
+    border:2px solid var(--muted);
+    opacity:.55;
+    transition:border-color .2s ease, opacity .2s ease;
+  }
+  .viewfinder::before{ top:0; left:0; border-right:0; border-bottom:0; }
+  .viewfinder::after{ bottom:0; left:0; border-right:0; border-top:0; }
+  .vf-tr{ top:0; right:0; border-left:0; border-bottom:0; }
+  .vf-br{ bottom:0; right:0; border-left:0; border-top:0; }
+  .viewfinder:focus-within::before,
+  .viewfinder:focus-within::after,
+  .viewfinder:focus-within .vf-tr,
+  .viewfinder:focus-within .vf-br{
+    border-color:var(--red); opacity:1;
+  }
+
+  .field{ display:flex; align-items:center; gap:8px; }
+  .field input{
+    flex:1; background:transparent; border:0; border-bottom:1px solid var(--line);
+    outline:0; color:var(--paper); font-family:'Space Grotesk',sans-serif;
+    font-size:16px; padding:10px 4px; font-weight:500;
+  }
+  .field input::placeholder{ color:var(--muted); font-weight:400; }
+  .field input:focus{ border-bottom-color:var(--red); }
+
+  .field button{
+    flex-shrink:0; background:var(--paper); color:var(--bg); border:0; border-radius:100px;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px;
+    padding:11px 20px; cursor:pointer;
+    transition:transform .12s ease, background .15s ease;
+  }
+  .field button:hover{ background:var(--red); color:var(--paper); }
+  .field button:active{ transform:scale(0.95); }
+  .field button:disabled{ opacity:.4; cursor:default; transform:none; }
+
+  .hint{ font-size:12px; color:var(--muted); margin:12px 4px 0; }
+
+  .status{ margin-top:18px; font-size:13.5px; color:var(--muted); display:none; }
+  .status.show{ display:block; }
+  .status.error{ color:var(--red); }
+
+  /* --- filmstrip preview card --- */
+  .card{ margin-top:30px; display:none; }
+  .card.show{ display:block; }
+  .sprockets{
+    display:flex; justify-content:space-between; padding:0 10px;
+  }
+  .sprockets span{
+    width:7px; height:7px; border-radius:1px;
+    background:var(--bg);
+    border:1px solid var(--line);
+  }
+  .filmbody{
+    background:var(--card);
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+    padding:12px;
+  }
+  .thumb{
+    width:100%; aspect-ratio:4/5; object-fit:cover; display:block;
+    background:#0a0a09; border-radius:2px;
+  }
+  .card-info{ padding:16px 4px 4px; }
+  .card-title{ font-size:16px; font-weight:700; margin:0 0 4px; line-height:1.3; }
+  .card-meta{
+    font-size:11px; color:var(--muted); margin:0 0 18px;
+    text-transform:uppercase; letter-spacing:.08em;
+  }
+  .dl-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    background:var(--red); color:var(--paper); border:0; border-radius:100px; padding:15px;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+    text-decoration:none; cursor:pointer; transition:filter .15s ease, transform .1s ease;
+  }
+  .dl-btn:hover{ filter:brightness(1.1); }
+  .dl-btn:active{ transform:scale(0.98); }
+  .dl-btn[disabled]{ opacity:.4; pointer-events:none; }
+  .dl-btn svg{ width:16px; height:16px; }
+
+  /* --- steps --- */
+  .steps{ margin-top:48px; padding-top:26px; border-top:1px solid var(--line); }
+  .steps h2{
+    font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:11px;
+    text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:0 0 18px;
+  }
+  .step{ display:flex; gap:14px; margin-bottom:16px; align-items:baseline; }
+  .step-n{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--red);
+    flex-shrink:0; width:20px;
+  }
+  .step p{ margin:0; font-size:14px; line-height:1.55; color:var(--paper); font-weight:400; }
+
+  .note{
+    margin-top:26px; font-size:12px; line-height:1.7; color:var(--muted);
+    padding:14px 16px; background:var(--card); border-radius:8px;
+  }
+
+  /* shutter flash on submit */
+  .flash{
+    position:fixed; inset:0; background:var(--paper); opacity:0; pointer-events:none;
+    z-index:50; transition:opacity .08s ease;
+  }
+  .flash.go{ opacity:1; transition:opacity 0s; }
+  .flash.fade{ opacity:0; transition:opacity .35s ease; }
+</style>
+</head>
+<body>
+<div class="flash" id="flash"></div>
+<div class="wrap">
+
+  <header>
+    <div class="counter-row">
+      <span class="rec-dot"></span>
+      <span class="counter mono">SIMPAN · TANPA LOGIN · GRATIS</span>
+    </div>
+    <h1>Simpan tiap <span>jepretan</span> & rekaman dari Facebook</h1>
+    <p class="lede">Tempel tautan postingan publik. Kami tarik filenya, kamu simpan ke galeri.</p>
+  </header>
+
+  <form id="form">
+    <div class="viewfinder">
+      <span class="vf-tr"></span><span class="vf-br"></span>
+      <div class="field">
+        <input id="url" type="url" inputmode="url" placeholder="https://www.facebook.com/…" required>
+        <button type="submit" id="go">Ambil</button>
+      </div>
+    </div>
+    <p class="hint">Berlaku untuk postingan, video, atau foto yang bersifat publik.</p>
+  </form>
+
+  <p class="status" id="status"></p>
+
+  <div class="card" id="card">
+    <div class="sprockets">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="filmbody">
+      <img class="thumb" id="thumb" alt="Pratinjau media">
+      <div class="card-info">
+        <p class="card-title" id="title">—</p>
+        <p class="card-meta mono" id="meta">—</p>
+        <a class="dl-btn" id="dlBtn" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+          <span id="dlLabel">Unduh ke perangkat</span>
+        </a>
+      </div>
+    </div>
+    <div class="sprockets">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <h2>Cara kerja</h2>
+    <div class="step"><span class="step-n mono">01</span><p>Buka postingan publik di Facebook, salin tautannya.</p></div>
+    <div class="step"><span class="step-n mono">02</span><p>Tempel di kotak atas, tekan Ambil.</p></div>
+    <div class="step"><span class="step-n mono">03</span><p>Tekan Unduh — file masuk ke folder Download / Galeri.</p></div>
+  </div>
+
+  <p class="note">
+    Halaman ini berjalan langsung di browser lewat proxy publik, tanpa server sendiri.
+    Gunakan hanya untuk konten publik atau milikmu sendiri, dan hormati hak cipta pembuat aslinya.
+  </p>
+
+</div>
+
+<script>
+const form = document.getElementById('form');
+const goBtn = document.getElementById('go');
+const status = document.getElementById('status');
+const card = document.getElementById('card');
+const thumb = document.getElementById('thumb');
+const title = document.getElementById('title');
+const meta = document.getElementById('meta');
+const dlBtn = document.getElementById('dlBtn');
+const flash = document.getElementById('flash');
+
+function setStatus(msg, isError){
+  status.textContent = msg;
+  status.className = 'status show' + (isError ? ' error' : '');
+}
+
+function shutterFlash(){
+  flash.classList.remove('fade');
+  flash.classList.add('go');
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      flash.classList.remove('go');
+      flash.classList.add('fade');
+    }, 60);
+  });
+}
+
+const PROXIES = [
+  (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  (u) => 'https://thingproxy.freeboard.io/fetch/' + u,
+];
+
+async function proxiedFetch(url){
+  let lastErr;
+  for(const build of PROXIES){
+    try{
+      const res = await fetch(build(url));
+      if(res.ok) return res;
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('Semua proxy sedang tidak bisa diakses, coba lagi sebentar lagi.');
+}
+
+function toMbasicUrl(inputUrl){
+  try{
+    const u = new URL(inputUrl);
+    u.hostname = 'mbasic.facebook.com';
+    return u.toString();
+  }catch{ return null; }
+}
+
+async function resolveMedia(rawUrl){
+  const pageUrl = toMbasicUrl(rawUrl) || rawUrl;
+  const res = await proxiedFetch(pageUrl);
+  const html = await res.text();
+
+  const hd = html.match(/"browser_native_hd_url":"([^"]+)"/);
+  const sd = html.match(/"browser_native_sd_url":"([^"]+)"/);
+  const ogVideo = html.match(/<meta property="og:video(?::url)?" content="([^"]+)"/);
+
+  let videoUrl = null;
+  if (hd) videoUrl = hd[1];
+  else if (sd) videoUrl = sd[1];
+  else if (ogVideo) videoUrl = ogVideo[1];
+
+  const ogTitle = html.match(/<meta property="og:title" content="([^"]+)"/);
+  const ogImage = html.match(/<meta property="og:image" content="([^"]+)"/);
+
+  if (videoUrl){
+    videoUrl = videoUrl.replace(/\\u0025/g, '%').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+    return {
+      type: 'video', ext: 'mp4', downloadUrl: videoUrl,
+      thumbnail: ogImage ? ogImage[1] : null,
+      title: ogTitle ? ogTitle[1] : 'Video Facebook',
+    };
+  }
+
+  if (ogImage){
+    const imgUrl = ogImage[1].replace(/&amp;/g, '&');
+    return {
+      type: 'photo', ext: 'jpg', downloadUrl: imgUrl,
+      thumbnail: imgUrl,
+      title: ogTitle ? ogTitle[1] : 'Foto Facebook',
+    };
+  }
+
+  throw new Error('Media tidak ditemukan. Postingan mungkin privat, sudah dihapus, atau formatnya berubah.');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = document.getElementById('url').value.trim();
+  if(!url) return;
+
+  shutterFlash();
+  card.classList.remove('show');
+  goBtn.disabled = true;
+  goBtn.textContent = '...';
+  setStatus('Mengambil data dari tautan…');
+
+  try{
+    const data = await resolveMedia(url);
+
+    thumb.src = data.thumbnail || '';
+    title.textContent = data.title || 'Media dari Facebook';
+    meta.textContent = data.type || 'file';
+
+    dlBtn.innerHTML = '<span id="dlLabel">Menyiapkan file…</span>';
+    dlBtn.setAttribute('disabled', 'true');
+
+    card.classList.add('show');
+    setStatus('');
+    status.classList.remove('show');
+
+    const filename = (data.type === 'video' ? 'facebook-video' : 'facebook-photo') + '.' + data.ext;
+    try{
+      const mediaRes = await proxiedFetch(data.downloadUrl);
+      const blob = await mediaRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      dlBtn.removeAttribute('disabled');
+      dlBtn.href = blobUrl;
+      dlBtn.setAttribute('download', filename);
+      const svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg>';
+      dlBtn.innerHTML = svg + '<span id="dlLabel">Unduh ' + (data.type === 'video' ? 'video' : 'foto') + '</span>';
+    }catch(err){
+      dlBtn.removeAttribute('disabled');
+      dlBtn.href = data.downloadUrl;
+      dlBtn.removeAttribute('download');
+      dlBtn.target = '_blank';
+      dlBtn.innerHTML = '<span id="dlLabel">Buka file (simpan manual)</span>';
+    }
+  }catch(err){
+    setStatus(err.message, true);
+  }finally{
+    goBtn.disabled = false;
+    goBtn.textContent = 'Ambil';
+  }
+});
+</script>
+</body>
+</html>
